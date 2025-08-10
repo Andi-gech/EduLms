@@ -1,0 +1,951 @@
+
+
+openapi: 3.0.0
+info:
+  title: DEC-ONLINE Backend API
+  version: 1.0.0
+  description: API documentation for DEC-ONLINE Backend
+tags:
+  - name: Users
+    description: User management and authentication
+  - name: Courses
+    description: Course management
+  - name: Enrollments
+    description: Enrollment and payment
+  - name: Exams
+    description: Exam management
+  - name: Modules
+    description: Course modules
+  - name: Categories
+    description: Course categories
+  - name: Notifications
+    description: User notifications
+  - name: Registrar
+    description: Registrar operations
+  - name: Departments
+    description: Department management
+  - name: Terms
+    description: Academic terms/semesters
+servers:
+  - url: http://localhost:8080
+    description: Local server
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      properties:
+        
+        fullName:
+          type: string
+          example: Andualem Getachew
+        email:
+          type: string
+          example: andi.fab23@gmail.com
+        password:
+          type: string
+          format: password
+          example: 1q2w3e4r5t@Ndi
+        confirmpassword:
+          type: string
+          format: password
+          example: 1q2w3e4r5t@Ndi
+        role:
+          type: string
+          enum: [Registrar, student, teacher, short_training_office, short_training_department, department_head, department_admin]
+          example: student
+        department:
+          type: string
+          nullable: true
+          description: Department ObjectId
+    Department:
+      type: object
+      properties:
+        _id:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        head:
+          type: string
+    Course:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        description: { type: string }
+        image: { type: string }
+        price: { type: number }
+        catagory: { type: string }
+        createdBy: { type: string }
+        department: { type: string, nullable: true }
+        assignedTeacher: { type: string, nullable: true }
+        startDate: { type: string, format: date-time, nullable: true }
+        endDate: { type: string, format: date-time, nullable: true }
+        theme: { type: string, nullable: true }
+    Term:
+      type: object
+      properties:
+        _id: { type: string }
+        name: { type: string }
+        code: { type: string }
+        startDate: { type: string, format: date-time }
+        endDate: { type: string, format: date-time }
+        active: { type: boolean }
+        profilepic:
+          type: string
+        
+          
+paths:  
+  
+  /api/users/login:
+    post:
+      tags: [Users]
+      summary: User login
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  example: andi.fab23@gmail.com
+                password:
+                  type: string
+                  example: 1q2w3e4r5t@Ndi
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                  role:
+                    type: string
+                  name:
+                    type: string
+                  id:
+                    type: string
+                  department:
+                    type: string
+  /api/users/register:
+    post:
+      tags: [Users]
+      summary: Register a new user
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/users:
+    get:
+      tags: [Users]
+      summary: Get all non-Registrar users
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: department
+          schema:
+            type: string
+          required: false
+          description: Optional Department ID to filter users by department
+      responses:
+        '200':
+          description: A list of users
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid department id
+  /api/users/teachers:
+    get:
+      tags: [Users]
+      summary: Get all teachers
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: department
+          schema:
+            type: string
+          required: false
+          description: Optional Department ID to filter teachers by department
+      responses:
+        '200':
+          description: A list of teachers
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid department id
+  /api/users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    '404':
+      description: User not found
+  /api/users/update/{id}:
+    put:
+      tags: [Users]
+      summary: Update user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: User updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+    delete:
+      tags: [Users]
+      summary: Delete user by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: User deleted
+  /api/users/me:
+    put:
+      tags: [Users]
+      summary: Update own profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+      responses:
+        '200':
+          description: Profile updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+  /api/users/{id}/rate:
+    put:
+      tags: [Users]
+      summary: Rate a user
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rate:
+                  type: number
+      responses:
+        '200':
+          description: User rated
+
+  /api/courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses (optionally filter by query/category)
+      responses:
+        '200':
+          description: A list of courses
+  /api/courses/{courseid}:
+    get:
+      tags: [Courses]
+      summary: Get course by ID (with details)
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Course details
+
+  # Enrollment endpoints
+  /api/Enrollments/payinfo/verify:
+    post:
+      tags: [Enrollments]
+      summary: Verify payment info
+      responses:
+        '200':
+          description: Payment verified
+  /api/Enrollments/pay/{id}:
+    post:
+      tags: [Enrollments]
+      summary: Initiate payment for a course
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Payment initiated
+  /api/Enrollments/{courseid}:
+    get:
+      tags: [Enrollments]
+      summary: Get enrollment for a specific course (for current user)
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Enrollment details
+  /api/Enrollments/completed:
+    get:
+      tags: [Enrollments]
+      summary: Get completed courses for current user
+      responses:
+        '200':
+          description: Completed courses
+  /api/Enrollments:
+    get:
+      tags: [Enrollments]
+      summary: Get all enrollments for current user
+      responses:
+        '200':
+          description: A list of enrollments
+    post:
+      tags: [Enrollments]
+      summary: Enroll in a course
+      responses:
+        '201':
+          description: Enrollment created
+  /api/Enrollments/{courseid}/completemodule:
+    put:
+      tags: [Enrollments]
+      summary: Mark module as completed for a course
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module marked as completed
+  /api/Enrollments/exam/{examid}/evaluate:
+    post:
+      tags: [Enrollments]
+      summary: Evaluate exam for an enrollment
+      parameters:
+        - in: path
+          name: examid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exam evaluated
+
+  # Exam endpoints
+  /api/exams/module/{moduleId}:
+    get:
+      tags: [Exams]
+      summary: Get exams for a module
+      parameters:
+        - in: path
+          name: moduleId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exams for module
+  /api/exams/{examId}:
+    get:
+      tags: [Exams]
+      summary: Get exam by ID
+      parameters:
+        - in: path
+          name: examId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Exam details
+    # Category endpoints (catagories)
+  /api/catagories:
+    post:
+      tags: [Categories]
+      summary: Create a new category (Registrar)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                image:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Category created
+    get:
+      tags: [Categories]
+      summary: Get all categories
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A list of categories
+  /api/catagories/{id}:
+    get:
+      tags: [Categories]
+      summary: Get category by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Category details
+
+  # Module endpoints (CourseModule)
+  /api/modules/{courseid}/create:
+    post:
+      tags: [Modules]
+      summary: Create a module for a course (teacher only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                order:
+                  type: integer
+                content:
+                  type: string
+                video:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Module created
+  /api/modules/{courseid}/delete/{id}:
+    delete:
+      tags: [Modules]
+      summary: Delete a module from a course (teacher only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module deleted
+  /api/modules/{moduleid}:
+    get:
+      tags: [Modules]
+      summary: Get single module by ID (Registrar/teacher)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: moduleid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module details
+  /api/modules/course/{courseid}:
+    get:
+      tags: [Modules]
+      summary: Get all modules for a course (Registrar/teacher)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Modules for course
+
+  # Notification endpoints
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: Get all notifications for current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: A list of notifications
+
+  # Courses endpoints (expanded)
+  /api/courses/inactive:
+    get:
+      tags: [Courses]
+      summary: Get all inactive courses (Registrar only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Inactive courses
+  /api/courses/approve/{id}:
+    put:
+      tags: [Courses]
+      summary: Approve a course (Registrar only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Course approved
+  /api/courses/registrar:
+    post:
+      tags: [Courses, Registrar]
+      summary: Create a new course (Registrar)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name: { type: string }
+                description: { type: string }
+                catagory: { type: string }
+                department: { type: string }
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+                theme: { type: string }
+                price: { type: number }
+                image: { type: string, format: binary }
+      responses:
+        '201': { description: Course created }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '500': { description: Internal server error }
+  /api/courses/{courseid}/assign-teacher/{teacherid}:
+    put:
+      tags: [Courses, Departments]
+      summary: Department assigns a teacher to a course
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema: { type: string }
+        - in: path
+          name: teacherid
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Teacher assigned }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+  /api/courses/{courseid}/schedule:
+    put:
+      tags: [Courses, Departments]
+      summary: Set course schedule and theme
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                startDate: { type: string, format: date-time }
+                endDate: { type: string, format: date-time }
+                theme: { type: string }
+      responses:
+        '200': { description: Updated }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+  /api/courses/{courseid}/details:
+    get:
+      tags: [Courses]
+      summary: Get single course with modules and students (Registrar/teacher)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Course details with modules and students
+  /api/courses/courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses created by the teacher
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Teacher's courses
+  /api/courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses (optionally filter by query/category)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Search query
+        - in: query
+          name: category
+          schema:
+            type: string
+          description: Category ID
+      responses:
+        '200':
+          description: A list of courses
+
+  # Enrollment endpoints (expanded)
+  /api/Enrollments/with-progress:
+    get:
+      tags: [Enrollments]
+      summary: Get all enrollments for current user with progress
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Enrollments with progress
+  /api/Enrollments/{courseid}/modules/progress:
+    get:
+      tags: [Enrollments]
+      summary: Get all modules for an enrolled course with completion status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Modules with completion status
+  /api/Enrollments/{courseid}/module/{moduleid}:
+    get:
+      tags: [Enrollments]
+      summary: Get a single module for an enrolled course with completion status
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseid
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: moduleid
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Module details with completion status
+  /api/Enrollments/assign/{courseId}/{studentId}:
+    post:
+      tags: [Enrollments]
+      summary: Short Training Office assigns a student to a course
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: studentId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Enrollment created }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '404': { description: Not found }
+
+  # Exams endpoints (expanded)
+  /api/exams:
+    post:
+      tags: [Exams]
+      summary: Add an exam (teacher only)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                CourseModule:
+                  type: string
+                questions:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      question:
+                        type: string
+                      mark:
+                        type: integer
+                      answers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            text:
+                              type: string
+                            isCorrect:
+                              type: boolean
+                examDate:
+                  type: string
+                  format: date-time
+                startTime:
+                  type: string
+                  format: date-time
+                endTime:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Exam created successfully
+        '400':
+          description: Bad request
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '404':
+          description: Not found
+        '500':
+          description: Internal server error
+# Additional endpoints from implementation
+
+  # Department endpoints
+  /api/departments:
+    post:
+      tags: [Departments, Registrar]
+      summary: Create a new department
+      security: [ { bearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Department'
+      responses:
+        '201': { description: Department created }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+        '500': { description: Internal server error }
+    get:
+      tags: [Departments]
+      summary: List departments
+      security: [ { bearerAuth: [] } ]
+      responses:
+        '200': { description: Departments list }
+  /api/departments/{deptId}/assign-head/{userId}:
+    put:
+      tags: [Departments, Registrar]
+      summary: Assign department head
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: deptId
+          required: true
+          schema: { type: string }
+        - in: path
+          name: userId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Head assigned }
+        '404': { description: Not found }
+
+  # Terms endpoints
+  /api/terms:
+    post:
+      tags: [Terms, Registrar]
+      summary: Create term
+      security: [ { bearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Term'
+      responses:
+        '201': { description: Term created }
+        '400': { description: Bad request }
+        '401': { description: Unauthorized }
+        '403': { description: Forbidden }
+    get:
+      tags: [Terms, Registrar]
+      summary: List terms
+      security: [ { bearerAuth: [] } ]
+      responses:
+        '200': { description: Terms list }
+  /api/terms/{id}/active:
+    put:
+      tags: [Terms, Registrar]
+      summary: Set active term
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Active term set }
+
+  /api/courses/courses:
+    get:
+      tags: [Courses]
+      summary: Get all courses created by the teacher (teacher only)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Teacher's courses
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden
+        '500':
+          description: Internal server error

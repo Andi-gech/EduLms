@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Actors and Their Endpoints</title>
+  <style>
+    body { font-family: 'Segoe UI', Arial, sans-serif; margin: 2rem; background: #f8f9fa; }
+    h1, h2 { color: #2c3e50; }
+    .endpoint-card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(44,62,80,0.08);
+      margin-bottom: 2rem;
+      padding: 1.5rem 2rem;
+      border-left: 6px solid #2980b9;
+      transition: box-shadow 0.2s;
+    }
+    .endpoint-card:hover {
+      box-shadow: 0 4px 16px rgba(44,62,80,0.15);
+    }
+    .endpoint-title {
+      font-size: 1.2rem;
+      font-weight: bold;
+      color: #2980b9;
+      margin-bottom: 0.5rem;
+    }
+    .endpoint-meta {
+      color: #555;
+      margin-bottom: 0.5rem;
+    }
+    .endpoint-desc {
+      margin-bottom: 1rem;
+    }
+    .code-block {
+      background: #23272e;
+      color: #eaeaea;
+      border-radius: 6px;
+      padding: 1rem;
+      font-size: 0.98rem;
+      overflow-x: auto;
+      margin-bottom: 1rem;
+      font-family: 'Fira Mono', 'Consolas', 'Menlo', monospace;
+    }
+    .req-label, .res-label {
+      font-size: 0.95rem;
+      font-weight: bold;
+      color: #16a085;
+      margin-bottom: 0.2rem;
+      display: block;
+    }
+    @media (max-width: 700px) {
+      .endpoint-card { padding: 1rem; }
+      .code-block { font-size: 0.92rem; }
+    }
+  </style>
+</head>
+<body>
+  <h1>Actors and Their Endpoints</h1>
+  <p>This document lists the main actors in the system and the API endpoints they can access.</p>
+
+  <h2>Actors</h2>
+  <ul>
+    <li><strong>Registrar</strong></li>
+    <li><strong>Teacher</strong></li>
+    <li><strong>Student</strong></li>
+  </ul>
+
+  <h2>Endpoints by Actor</h2>
+
+  <!-- BEGIN ENDPOINT CARDS -->
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - List all users</div>
+    <div class="endpoint-meta"><b>GET</b> /api/users/</div>
+    <div class="endpoint-desc">Returns a list of all users.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/users/
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "users": [
+    {"_id": "...", "email": "...", "role": "Registrar"}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - List all teachers</div>
+    <div class="endpoint-meta"><b>GET</b> /api/users/teachers</div>
+    <div class="endpoint-desc">Returns a list of all teachers.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/users/teachers
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "teachers": [
+    {"_id": "...", "email": "...", "role": "teacher"}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - Manage user by ID</div>
+    <div class="endpoint-meta"><b>GET, PUT, DELETE</b> /api/users/:id</div>
+    <div class="endpoint-desc">Get, update, or delete a user by ID.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/users/123
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "_id": "...",
+  "email": "...",
+  "role": "Registrar"
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - List inactive courses</div>
+    <div class="endpoint-meta"><b>GET</b> /api/courses/inactive</div>
+    <div class="endpoint-desc">Returns a list of inactive courses.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/courses/inactive
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "courses": [
+    {"_id": "...", "title": "...", "status": "inactive"}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - Approve a course</div>
+    <div class="endpoint-meta"><b>PUT</b> /api/courses/approve/:id</div>
+    <div class="endpoint-desc">Approve a course by ID.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">PUT /api/courses/approve/123
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Course approved"
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - Manage course categories</div>
+    <div class="endpoint-meta"><b>POST, GET</b> /api/categories/</div>
+    <div class="endpoint-desc">Create or list course categories.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/categories/
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "categories": [
+    {"_id": "...", "name": "..."}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Registrar - List all modules</div>
+    <div class="endpoint-meta"><b>GET</b> /api/modules/</div>
+    <div class="endpoint-desc">Returns a list of all modules.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/modules/
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "modules": [
+    {"_id": "...", "title": "..."}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Create and list courses</div>
+    <div class="endpoint-meta"><b>POST, GET</b> /api/courses/</div>
+    <div class="endpoint-desc">Create a new course or list all courses.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/courses/
+Authorization: Bearer &lt;token&gt;
+Content-Type: application/json
+{
+  "title": "Course Title",
+  "description": "..."
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "courses": [
+    {"_id": "...", "title": "..."}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Get course details</div>
+    <div class="endpoint-meta"><b>GET</b> /api/courses/:courseid/details</div>
+    <div class="endpoint-desc">Get details for a specific course.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/courses/123/details
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "_id": "...",
+  "title": "...",
+  "modules": [...]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Create a module</div>
+    <div class="endpoint-meta"><b>POST</b> /api/modules/:courseid/create</div>
+    <div class="endpoint-desc">Create a new module for a course.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/modules/123/create
+Authorization: Bearer &lt;token&gt;
+Content-Type: application/json
+{
+  "title": "Module Title",
+  "content": "..."
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Module created",
+  "module": {"_id": "...", "title": "..."}
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Delete a module</div>
+    <div class="endpoint-meta"><b>DELETE</b> /api/modules/:courseid/delete/:id</div>
+    <div class="endpoint-desc">Delete a module by ID.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">DELETE /api/modules/123/delete/456
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Module deleted"
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Create an exam</div>
+    <div class="endpoint-meta"><b>POST</b> /api/exams/</div>
+    <div class="endpoint-desc">Create a new exam.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/exams/
+Authorization: Bearer &lt;token&gt;
+Content-Type: application/json
+{
+  "title": "Exam Title",
+  "questions": [...]
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Exam created",
+  "exam": {"_id": "...", "title": "..."}
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Teacher - Get exams for a module</div>
+    <div class="endpoint-meta"><b>GET</b> /api/exams/module/:moduleId</div>
+    <div class="endpoint-desc">Get all exams for a specific module.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/exams/module/123
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "exams": [
+    {"_id": "...", "title": "..."}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Student - View enrolled courses with progress</div>
+    <div class="endpoint-meta"><b>GET</b> /api/Enrollments/with-progress</div>
+    <div class="endpoint-desc">View all enrolled courses and their progress.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/Enrollments/with-progress
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "enrollments": [
+    {"course": "...", "progress": 50}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Student - View module progress</div>
+    <div class="endpoint-meta"><b>GET</b> /api/Enrollments/:courseid/modules/progress</div>
+    <div class="endpoint-desc">View progress for all modules in a course.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/Enrollments/123/modules/progress
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "modules": [
+    {"_id": "...", "progress": 80}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Student - View a specific module</div>
+    <div class="endpoint-meta"><b>GET</b> /api/Enrollments/:courseid/module/:moduleid</div>
+    <div class="endpoint-desc">View details for a specific module.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/Enrollments/123/module/456
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "_id": "...",
+  "title": "...",
+  "content": "..."
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Student - Pay for a course</div>
+    <div class="endpoint-meta"><b>POST</b> /api/Enrollments/pay/:id</div>
+    <div class="endpoint-desc">Pay for a course by ID.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/Enrollments/pay/123
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Payment successful"
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">Student - Submit exam answers</div>
+    <div class="endpoint-meta"><b>POST</b> /api/Enrollments/exam/:examid/evaluate</div>
+    <div class="endpoint-desc">Submit answers for an exam.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/Enrollments/exam/123/evaluate
+Authorization: Bearer &lt;token&gt;
+Content-Type: application/json
+{
+  "answers": [...]
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Exam submitted",
+  "score": 85
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">All - View notifications</div>
+    <div class="endpoint-meta"><b>GET</b> /api/notifications/</div>
+    <div class="endpoint-desc">View all notifications for the user.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">GET /api/notifications/
+Authorization: Bearer &lt;token&gt;</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "notifications": [
+    {"_id": "...", "message": "..."}
+  ]
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">All - Login</div>
+    <div class="endpoint-meta"><b>POST</b> /api/users/login</div>
+    <div class="endpoint-desc">Authenticate and receive a JWT token.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/users/login
+Content-Type: application/json
+{
+  "email": "user@example.com",
+  "password": "Password@123!"
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "token": "..."
+}</div>
+  </div>
+
+  <div class="endpoint-card">
+    <div class="endpoint-title">All - Register</div>
+    <div class="endpoint-meta"><b>POST</b> /api/users/register</div>
+    <div class="endpoint-desc">Register a new user.</div>
+    <span class="req-label">Request Example:</span>
+    <div class="code-block">POST /api/users/register
+Content-Type: application/json
+{
+  "fullName": "Test User",
+  "email": "user@example.com",
+  "password": "Password@123!",
+  "confirmpassword": "Password@123!",
+  "role": "student"
+}</div>
+    <span class="res-label">Response Example:</span>
+    <div class="code-block">{
+  "message": "Registration successful"
+}</div>
+  </div>
+  <!-- END ENDPOINT CARDS -->
+
+  <p><em>Note: Some endpoints may require specific roles or ownership. See API docs for details.</em></p>
+</body>
+</html>
