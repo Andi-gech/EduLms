@@ -39,13 +39,15 @@ router.get('/with-progress', AuthMiddleware,allowedRoles('student'), async (req,
   try {
 
  
-    const enrolledCourses = await EnrolledCourse.find({ user: req.user._id })
-      .populate({
-        path: "course",
-        select: 'coursemodules name',
-        populate: { path: "coursemodules", select: '_id' }
-      })
-      .lean();
+   const enrolledCourses = await EnrolledCourse.find({ user: req.user._id })
+  .populate({
+    path: "course",
+    select: "coursemodules name description startDate endDate image assignedInstructor",
+    populate: [
+      { path: "coursemodules", select: "_id name title" },
+      { path: "assignedTeacher", select: "fullName profilepic" }
+    ]
+  }).lean();
       console.log('Enrolled courses:', enrolledCourses);
      
     const result = enrolledCourses.map(enroll => {
@@ -86,7 +88,11 @@ router.get('/:courseid/modules/progress', AuthMiddleware, isEnrolled, async (req
       return res.status(403).send('You are not enrolled in this course');
     }
     
-    const modules = await CourseModule.find({ course: req.params.courseid }).sort({ order: 1 }).lean();
+    let modules = await CourseModule.find({ course: req.params.courseid }).sort({ order: 1 }).lean();
+    // Hide unapproved modules from students
+    if (req.user.role === 'student') {
+      modules = modules.filter(m => m.status === 'approved');
+    }
  
     const completedSet = new Set((enrolled.completedModules || []).map(m => m.id.toString()));
     
@@ -132,6 +138,9 @@ router.get('/:courseid/module/:moduleid', AuthMiddleware, isEnrolled, async (req
     if (!module) {
       return res.status(404).send('Module not found');
     }
+    if (req.user.role === 'student' && module.status !== 'approved') {
+      return res.status(404).send('Module not found');
+    }
     
     const completedSet = new Set((enrolled.completedModules || []).map(m => m.id.toString()));
     const completed = completedSet.has(module._id.toString());
@@ -140,8 +149,10 @@ router.get('/:courseid/module/:moduleid', AuthMiddleware, isEnrolled, async (req
       _id: module._id,
       name: module.name,
       order: module.order,
+      type: module.type,
       content: module.content,
       videolink: module.videolink,
+      linkUrl: module.linkUrl,
       completed
     });
   } catch (error) {
@@ -169,7 +180,7 @@ if (course.endDate && new Date() > new Date(course.endDate)) {
 }
 
 const customerInfo =  {
-  amount: course.price||0,
+  amount: 0,
   currency: 'ETB',
   email: user.email,
   first_name: user.fullName,
@@ -231,75 +242,71 @@ router.post('/assign/:courseId/:studentId', AuthMiddleware, allowedRoles('short_
   }
 });
 
+// Unassign / remove enrollment (short training office)
+router.delete('/assign/:courseId/:studentId', AuthMiddleware, allowedRoles('short_training_office'), async (req, res) => {
+  try {
+    const { courseId, studentId } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(courseId) || !mongoose.Types.ObjectId.isValid(studentId)) return res.status(400).send('Invalid id');
+    const enrollment = await EnrolledCourse.findOneAndDelete({ course: courseId, user: studentId });
+    if (!enrollment) return res.status(404).send('Enrollment not found');
+    return res.json({ removed: true });
+  } catch (error) {
+    logger.error('Error in DELETE /Enrollments/assign/:courseId/:studentId: %o', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 
 
 
 router.put('/:courseid/completemodule', AuthMiddleware, async (req, res) => {
   try {
-  
-  const courseInfo = await Course.findById(req.params.courseid).select('startDate endDate').populate('coursemodules');
-  if (!courseInfo) return res.status(404).send('Course not found');
+    const { courseid } = req.params;
+    const { moduleid } = req.body;
+    if (!mongoose.Types.ObjectId.isValid(courseid) || !mongoose.Types.ObjectId.isValid(moduleid)) {
+      return res.status(400).send('Invalid id');
+    }
+    const courseInfo = await Course.findById(courseid).select('startDate endDate').populate('coursemodules');
+    if (!courseInfo) return res.status(404).send('Course not found');
     const now = new Date();
-  if (courseInfo.startDate && now < new Date(courseInfo.startDate)) {
-      return res.status(403).send('Course not started yet');
+    if (courseInfo.startDate && now < new Date(courseInfo.startDate)) return res.status(403).send('Course not started yet');
+    if (courseInfo.endDate && now > new Date(courseInfo.endDate)) return res.status(403).send('Course has ended');
+
+    const courseModule = await CourseModule.findById(moduleid);
+    if (!courseModule) return res.status(404).send('Module not found');
+
+    // Sequential unlock: ensure all previous ordered modules are already completed
+    const ordered = [...courseInfo.coursemodules].sort((a, b) => a.order - b.order);
+    const targetIndex = ordered.findIndex(m => m._id.equals(courseModule._id));
+    if (targetIndex === -1) return res.status(400).send('Module not part of course');
+
+    let enrollment = await EnrolledCourse.findOne({ course: courseid, user: req.user._id });
+    if (!enrollment) return res.status(404).send('User not enrolled to this course');
+
+    const completedSet = new Set((enrollment.completedModules || []).map(cm => cm.id.toString()));
+    for (let i = 0; i < targetIndex; i++) {
+      if (!completedSet.has(ordered[i]._id.toString())) {
+        return res.status(400).send('Previous module not completed');
+      }
     }
-  if (courseInfo.endDate && now > new Date(courseInfo.endDate)) {
-      return res.status(403).send('Course has ended');
-    }
-    const isvalid = mongoose.Types.ObjectId.isValid(req.body.moduleid);
-  
-    if (!isvalid) {
-      return res.status(400).send("invalid id");
+
+    // Remove prior exam pass requirement (exam optional now)
+    if (completedSet.has(moduleid)) {
+      return res.json({ alreadyCompleted: true, enrollment });
     }
 
-    const courseModule = await CourseModule.findById(req.body.moduleid);
-    if (!courseModule) {
-      return res.status(404).send("Module not found");
+    enrollment.completedModules.push({ id: moduleid });
+
+    if (enrollment.completedModules.length === courseInfo.coursemodules.length) {
+      enrollment.status = 'completed';
+      enrollment.completedAt = new Date();
     }
-    const isExamExist = await Exam.findOne({
-      CourseModule: courseModule._id,
-    });
-    
 
-    const userPassedTheExam = await Result.findOne({
-      user: req.user._id,
-      exam: isExamExist._id,
-      ispassed: true,
-    });
-
-    if (isExamExist && !userPassedTheExam) {
-      return res.status(400).send("You must pass the exam before completing the module");
-    }
-    
-   let enrolledCourse = await EnrolledCourse.findOneAndUpdate(
-  {
-    course: req.params.courseid,
-    user: req.user._id,
-  },
-  {
-    $push: {
-      completedModules: {
-        id: req.body.moduleid,
-      },
-    },
-  },
-  { new: true }
-);
-
-if (!enrolledCourse) {
-  return res.status(404).send("User not enrolled to this course");
-}
-
-const course = await Course.findById(req.params.courseid).populate('coursemodules');
-if (enrolledCourse.completedModules.length === course.coursemodules.length) {
-  enrolledCourse.status = 'completed';
-  enrolledCourse.completedAt = new Date();
-  await enrolledCourse.save();
-}
-
-return res.send(enrolledCourse);
+    await enrollment.save();
+    return res.json(enrollment);
   } catch (error) {
-    return res.status(500).send(error.message);
+    logger.error('Error in PUT /Enrollments/:courseid/completemodule %o', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 

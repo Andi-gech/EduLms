@@ -1,36 +1,29 @@
 import * as React from "react"
-import { ChevronsUpDown, Plus } from "lucide-react"
+import { BookCheck, Check } from "lucide-react"
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "@/components/ui/sidebar"
+import { cn } from "@/lib/utils"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar"
+interface Team { 
+  name: string;
+  role: string;
+  email: string;
+  avatarUrl?: string;
+}
+interface TeamSwitcherProps { teams: Team[]; onChange?: (team: Team) => void }
 
-export function TeamSwitcher({
-  teams,
-}: {
-  teams: {
-    name: string
-    logo: React.ElementType
-    plan: string
-  }[]
-}) {
-  const { isMobile } = useSidebar()
-  const [activeTeam, setActiveTeam] = React.useState(teams[0])
+export function TeamSwitcher({ teams, onChange }: TeamSwitcherProps) {
+  const [activeTeam, setActiveTeam] = React.useState<Team | null>(() => teams[0] || null)
 
-  if (!activeTeam) {
-    return null
+  React.useEffect(() => {
+    if (!activeTeam && teams.length) setActiveTeam(teams[0])
+  }, [teams, activeTeam])
+
+  if (!activeTeam) return null
+
+  const handleSelect = (team: Team) => {
+    setActiveTeam(team)
+    onChange?.(team)
   }
 
   return (
@@ -42,45 +35,36 @@ export function TeamSwitcher({
               size="lg"
               className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
             >
-              <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg">
-                <activeTeam.logo className="size-4" />
-              </div>
+             <img src={"http://www.etdu.edu.et/wp-content/uploads/2023/12/new_logo.jpeg"} alt={activeTeam.name} className="h-8 w-8 rounded-lg object-cover" />
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-medium">{activeTeam.name}</span>
-                <span className="truncate text-xs">{activeTeam.plan}</span>
+                <span className="truncate text-xs">{activeTeam.role}</span>
               </div>
-              <ChevronsUpDown className="ml-auto" />
+              <BookCheck className="size-4 opacity-50" />
             </SidebarMenuButton>
           </DropdownMenuTrigger>
-          <DropdownMenuContent
-            className="w-(--radix-dropdown-menu-trigger-width) min-w-56 rounded-lg"
-            align="start"
-            side={isMobile ? "bottom" : "right"}
-            sideOffset={4}
-          >
-            <DropdownMenuLabel className="text-muted-foreground text-xs">
-              Teams
-            </DropdownMenuLabel>
-            {teams.map((team, index) => (
-              <DropdownMenuItem
-                key={team.name}
-                onClick={() => setActiveTeam(team)}
-                className="gap-2 p-2"
-              >
-                <div className="flex size-6 items-center justify-center rounded-md border">
-                  <team.logo className="size-3.5 shrink-0" />
-                </div>
-                {team.name}
-                <DropdownMenuShortcut>⌘{index + 1}</DropdownMenuShortcut>
-              </DropdownMenuItem>
-            ))}
+          <DropdownMenuContent align="start" sideOffset={8} className="w-52">
+            <DropdownMenuLabel className="text-xs font-medium">Switch Role</DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2">
-              <div className="flex size-6 items-center justify-center rounded-md border bg-transparent">
-                <Plus className="size-4" />
-              </div>
-              <div className="text-muted-foreground font-medium">Add team</div>
-            </DropdownMenuItem>
+            {teams.map(t => {
+              const active = t.name === activeTeam.name
+              return (
+                <DropdownMenuItem
+                  key={t.name}
+                  onSelect={(e) => { e.preventDefault(); handleSelect(t) }}
+                  className={cn("flex items-center gap-2 text-xs cursor-pointer", active && "text-primary font-semibold")}
+                >
+                  <div className="flex h-7 w-7 items-center justify-center rounded-md bg-muted text-[11px] font-semibold uppercase">
+                    {t.name.charAt(0)}
+                  </div>
+                  <div className="flex flex-col leading-tight">
+                    <span>{t.name}</span>
+                    <span className="text-[10px] text-muted-foreground">{t.role}</span>
+                  </div>
+                  {active && <Check className="ml-auto size-3.5" />}
+                </DropdownMenuItem>
+              )
+            })}
           </DropdownMenuContent>
         </DropdownMenu>
       </SidebarMenuItem>

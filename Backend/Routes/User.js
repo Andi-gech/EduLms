@@ -43,7 +43,8 @@ router.get('/', AuthMiddleware, allowedRoles('Registrar'), async (req, res) => {
 });
 
 
-router.get('/teachers', AuthMiddleware, allowedRoles('Registrar'), async (req, res) => {
+// List teachers (Registrar + department heads/admins for their department)
+router.get('/teachers', AuthMiddleware, allowedRoles('Registrar','department_head','department_admin'), async (req, res) => {
     try {
         const { department } = req.query;
         const filter = { role: 'teacher' };
@@ -61,10 +62,44 @@ router.get('/teachers', AuthMiddleware, allowedRoles('Registrar'), async (req, r
     }
 });
 
+// List students (Registrar, short training office, department head/admin) optionally filtered by department
+router.get('/students', AuthMiddleware, allowedRoles('Registrar','short_training_office','department_head','department_admin'), async (req, res) => {
+    try {
+        const { department } = req.query;
+        const filter = { role: 'student' };
+        if (department) {
+            if (!mongoose.Types.ObjectId.isValid(department)) {
+                return res.status(400).send('Invalid department id');
+            }
+            filter.department = department;
+        }
+        const result = await User.find(filter).select('-password').lean();
+        return res.send(result);
+    } catch (error) {
+        logger.error('Error in GET /users/students: %o', error);
+        return res.status(500).send(error.message);
+    }
+});
+
+
+// Current authenticated user (define before /:id to prevent '/me' being captured by param route)
+router.get('/me', AuthMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.user._id).select('-password').lean();
+        if (!user) return res.status(404).send('User not found');
+        return res.send(user);
+    } catch (error) {
+        logger.error('Error in GET /users/me: %o', error);
+        return res.status(500).send(error.message);
+    }
+});
 
 router.get('/:id', AuthMiddleware, allowedRoles('Registrar'), async (req, res) => {
     try {
-        const result = await User.findById(req.params.id).select('-password').lean();
+        const { id } = req.params;
+        if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).send('Invalid id');
+        const result = await User.findById(id).select('-password').lean();
+        if (!result) return res.status(404).send('User not found');
         return res.send(result);
     } catch (error) {
         logger.error('Error in GET /users/:id: %o', error);
@@ -104,7 +139,9 @@ router.post('/login', async (req, res) => {
             role: user.role,
             name: user.fullName,
             id: user._id,
-            department: user.department
+            department: user.department,
+            pic: user.profilepic,
+            email: user.email
         });
     } catch (error) {
         logger.error('Error in POST /users/login: %o', error);
@@ -154,6 +191,28 @@ router.put('/me', AuthMiddleware, upload.single("profilepic"), async (req, res) 
         return res.status(500).send(error.message);
     }
 });
+
+// Change password (authenticated user)
+router.put('/me/password', AuthMiddleware, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) return res.status(400).json({ error: 'currentPassword and newPassword required' });
+        const user = await User.findById(req.user._id);
+        if (!user) return res.status(404).send('User not found');
+        const valid = await bcrypt.compare(currentPassword, user.password);
+        if (!valid) return res.status(400).json({ error: 'Current password incorrect' });
+        // Basic strength check fallback (backend already enforces on register)
+        if (typeof newPassword !== 'string' || newPassword.length < 8) return res.status(400).json({ error: 'New password too short' });
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(newPassword, salt);
+        await user.save();
+        res.json({ changed: true });
+    } catch (error) {
+        logger.error('Error in PUT /users/me/password: %o', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+    }
+});
+
 
 router.delete('/:id',AuthMiddleware, async (req, res) => {
     try {

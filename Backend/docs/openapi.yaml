@@ -26,6 +26,8 @@ tags:
     description: Department management
   - name: Terms
     description: Academic terms/semesters
+  - name: Assignments
+    description: Course assignments and submissions
 servers:
   - url: http://localhost:8080
     description: Local server
@@ -84,14 +86,13 @@ components:
         name: { type: string }
         description: { type: string }
         image: { type: string }
-        price: { type: number }
-        catagory: { type: string }
+  # price & catagory removed
         createdBy: { type: string }
         department: { type: string, nullable: true }
         assignedTeacher: { type: string, nullable: true }
         startDate: { type: string, format: date-time, nullable: true }
         endDate: { type: string, format: date-time, nullable: true }
-        theme: { type: string, nullable: true }
+  # theme removed
     Term:
       type: object
       properties:
@@ -625,12 +626,12 @@ paths:
               properties:
                 name: { type: string }
                 description: { type: string }
-                catagory: { type: string }
+                # catagory removed
                 department: { type: string }
                 startDate: { type: string, format: date-time }
                 endDate: { type: string, format: date-time }
-                theme: { type: string }
-                price: { type: number }
+                # theme removed
+                # price removed
                 image: { type: string, format: binary }
       responses:
         '201': { description: Course created }
@@ -638,6 +639,105 @@ paths:
         '401': { description: Unauthorized }
         '403': { description: Forbidden }
         '500': { description: Internal server error }
+
+  # Assignments endpoints
+  /api/assignments:
+    post:
+      tags: [Assignments]
+      summary: Create an assignment (teacher)
+      security: [ { bearerAuth: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string }
+                description: { type: string }
+                points: { type: number }
+                course: { type: string }
+                module: { type: string }
+                dueDate: { type: string, format: date-time }
+      responses:
+        '201': { description: Assignment created }
+        '400': { description: Bad request }
+  /api/assignments/course/{courseId}:
+    get:
+      tags: [Assignments]
+      summary: List assignments for a course
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: courseId
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Assignments list }
+        '400': { description: Invalid id }
+  /api/assignments/{id}:
+    get:
+      tags: [Assignments]
+      summary: Get single assignment (plus submission if student)
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Assignment detail }
+        '404': { description: Not found }
+  /api/assignments/{id}/submit:
+    post:
+      tags: [Assignments]
+      summary: Submit assignment (student)
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                notes:
+                  type: string
+      responses:
+        '201': { description: Submission stored }
+        '400': { description: Already submitted or invalid }
+  /api/assignments/{id}/grade/{studentId}:
+    post:
+      tags: [Assignments]
+      summary: Grade a submission (teacher)
+      security: [ { bearerAuth: [] } ]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: { type: string }
+        - in: path
+          name: studentId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                grade: { type: number }
+      responses:
+        '200': { description: Submission graded }
+        '404': { description: Not found }
   /api/courses/{courseid}/assign-teacher/{teacherid}:
     put:
       tags: [Courses, Departments]
@@ -662,7 +762,7 @@ paths:
   /api/courses/{courseid}/schedule:
     put:
       tags: [Courses, Departments]
-      summary: Set course schedule and theme
+  summary: Set course schedule
       security:
         - bearerAuth: []
       parameters:
@@ -679,7 +779,7 @@ paths:
               properties:
                 startDate: { type: string, format: date-time }
                 endDate: { type: string, format: date-time }
-                theme: { type: string }
+                # theme removed
       responses:
         '200': { description: Updated }
         '400': { description: Bad request }

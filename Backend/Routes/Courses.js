@@ -7,6 +7,7 @@ const allowedRoles = require('../Middleware/allowedRoles');
 const multer = require('multer');
 const path = require('path');
 const logger = require('../Middleware/winstonLogger');
+const mongoose = require('mongoose');
 
 
 router.get('/inactive', AuthMiddleware, allowedRoles('Registrar'), async (req, res) => {
@@ -35,13 +36,12 @@ router.put('/:courseid/schedule', AuthMiddleware, allowedRoles('Registrar'), asy
     const course = await Course.findById(req.params.courseid);
     if (!course) return res.status(404).send('Course not found');
    
-    const { startDate, endDate, theme } = req.body;
+  const { startDate, endDate } = req.body;
     if (startDate) course.startDate = new Date(startDate);
     if (endDate) course.endDate = new Date(endDate);
     if (endDate && startDate && new Date(endDate) < new Date(startDate)) {
       return res.status(400).send('Invalid schedule: endDate must be after startDate');
     }
-    if (theme !== undefined) course.theme = theme;
     await course.save();
     return res.send(course);
   } catch (error) {
@@ -51,7 +51,7 @@ router.put('/:courseid/schedule', AuthMiddleware, allowedRoles('Registrar'), asy
 });
 
 
-router.get('/:courseid/details', AuthMiddleware, allowedRoles('Registrar', 'teacher'), async (req, res) => {
+router.get('/:courseid/details', AuthMiddleware, allowedRoles('Registrar', 'teacher','department_head','department_admin','short_training_office'), async (req, res) => {
   try {
     const coursePromise = Course.findById(req.params.courseid).lean();
     const modulesPromise = require('../model/CourseModule').CourseModule.find({ course: req.params.courseid }).sort({ order: 1 }).lean();
@@ -74,10 +74,13 @@ router.get('/:courseid/details', AuthMiddleware, allowedRoles('Registrar', 'teac
 });
 
 
+// Generic list (all roles) with optional search / pagination
 router.get('/', AuthMiddleware, async (req, res) => {
   try {
     const query = req.query.q || '';
-    const categoryId = req.query.category || '';
+  const categoryId = req.query.category || '';
+  const page = parseInt(req.query.page, 10) || 1;
+  const pageSize = parseInt(req.query.pageSize, 10) || 0; // if 0 return all (legacy behavior)
 
     let searchCriteria = {
  };
@@ -87,11 +90,14 @@ router.get('/', AuthMiddleware, async (req, res) => {
       searchCriteria.$or = [{ name: regex }, { description: regex }];
     }
 
-    if (categoryId) {
-      searchCriteria.catagory = categoryId;
-    }
+  // catagory removed
 
-    let result = await Course.find(searchCriteria).select('-__v').lean();
+    let cursor = Course.find(searchCriteria).select('-__v');
+    const total = await Course.countDocuments(searchCriteria);
+    if (pageSize > 0) {
+      cursor = cursor.skip((page - 1) * pageSize).limit(pageSize);
+    }
+    let result = await cursor.lean();
     // For students, only show currently active (in time window) courses
     if (req.user.role === 'student') {
       const now = new Date();
@@ -101,10 +107,100 @@ router.get('/', AuthMiddleware, async (req, res) => {
         return true;
       });
     }
-    res.send(result);
+    if (pageSize > 0) {
+      return res.json({ data: result, total, page, pageSize });
+    }
+    return res.send(result);
   } catch (error) {
     logger.error('Error in GET /courses: %o', error);
     res.status(500).send(error.message);
+  }
+});
+
+// Department-scoped courses for department head/admin to manage (assignment etc.)
+router.get('/department/mine', AuthMiddleware, allowedRoles('department_head','department_admin'), async (req, res) => {
+  try {
+    const filter = { }; // status independent; show all in department
+    if (req.user.department) filter.department = req.user.department;
+    const courses = await Course.find(filter).select('-__v').lean();
+    return res.json(courses);
+  } catch (error) {
+    logger.error('Error in GET /courses/department/mine: %o', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Department overview aggregate
+router.get('/department/overview/stats', AuthMiddleware, allowedRoles('department_head','department_admin'), async (req, res) => {
+  try {
+    if (!req.user.department) return res.json({ courses: 0, enrollments: [], exams: [], upcoming: [] });
+    const deptId = req.user.department;
+
+    // Courses in department
+    const courses = await Course.find({ department: deptId }).select('name _id assignedTeacher').lean();
+    const courseIds = courses.map(c => c._id);
+
+    // Enrollment counts per course
+    const EnrolledCourse = require('../model/EnrolledCourse').EnrolledCourse;
+    const enrollmentsRaw = await EnrolledCourse.aggregate([
+      { $match: { course: { $in: courseIds } } },
+      { $group: { _id: '$course', count: { $sum: 1 } } }
+    ]);
+    const enrollmentMap = Object.fromEntries(enrollmentsRaw.map(e => [e._id.toString(), e.count]));
+
+    // Exams whose course belongs to this department (populate course + assignedTeacher + createdBy)
+    const Exam = require('../model/Exam').Exam;
+    const examDocs = await Exam.find({})
+      .populate({
+        path: 'course',
+        select: 'department assignedTeacher name',
+        populate: { path: 'assignedTeacher', select: 'fullName' }
+      })
+      .populate({ path: 'createdBy', select: 'fullName' })
+      .select('title course startTime endTime examDate status createdBy')
+      .lean();
+
+    const deptExams = examDocs.filter(e => e.course && e.course.department && e.course.department.toString() === deptId.toString());
+    const deptExamIds = deptExams.map(e => e._id);
+
+    // Aggregate approved results for pass statistics
+    const Result = require('../model/Result').Result;
+    const resultAgg = await Result.aggregate([
+      { $match: { exam: { $in: deptExamIds }, approved: true } },
+      { $group: { _id: '$exam', total: { $sum: 1 }, passed: { $sum: { $cond: ['$ispassed', 1, 0] } } } }
+    ]);
+    const resultMap = Object.fromEntries(resultAgg.map(r => [r._id.toString(), { total: r.total, passed: r.passed }]));
+
+    const now = new Date();
+    const upcomingRaw = deptExams.filter(e => {
+      const start = e.startTime ? new Date(e.startTime) : (e.examDate ? new Date(e.examDate) : null);
+      return start && start > now;
+    }).slice(0, 10);
+
+    const examsSummary = deptExams.map(e => ({
+      _id: e._id,
+      title: e.title,
+      status: e.status,
+      total: resultMap[e._id.toString()]?.total || 0,
+      passed: resultMap[e._id.toString()]?.passed || 0
+    }));
+
+    res.json({
+      courses: courses.length,
+      enrollments: courses.map(c => ({ courseId: c._id, name: c.name, users: enrollmentMap[c._id.toString()] || 0 })),
+      exams: examsSummary,
+      upcoming: upcomingRaw.map(u => ({
+        _id: u._id,
+        title: u.title,
+        when: u.startTime || u.examDate,
+        courseId: u.course._id || u.course,
+        courseName: u.course.name,
+        instructorName: (u.course.assignedTeacher && u.course.assignedTeacher.fullName) || (u.createdBy && u.createdBy.fullName) || ''
+      }))
+    });
+  } catch (error) {
+    logger.error('Error in GET /courses/department/overview/stats: %o', error);
+    res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -113,10 +209,27 @@ router.get('/', AuthMiddleware, async (req, res) => {
 
 
 
+// Teacher own / assigned courses (must be BEFORE dynamic :courseid route to avoid conflicts)
+router.get('/courses', AuthMiddleware, allowedRoles('teacher'), async (req, res) => {
+  try {
+    const result = await Course.find({
+      $or: [
+        { createdBy: req.user._id },
+        { assignedTeacher: req.user._id }
+      ]
+    }).lean();
+    return res.send(result);
+  } catch (error) {
+    logger.error('Error in GET /courses/courses: %o', error);
+    res.status(500).send(error.message);
+  }
+});
+
 router.get('/:courseid', AuthMiddleware, async (req, res) => {
   try {
-    const result = await Course.findById(req.params.courseid)
-      .populate({ path: 'catagory', select: 'name' })
+    const { courseid } = req.params;
+    if (!mongoose.Types.ObjectId.isValid(courseid)) return res.status(400).send('Invalid id');
+  const result = await Course.findById(courseid)
       .populate({ path: 'createdBy', select: 'fullName email' })
       .populate({
         path: 'coursemodules',
@@ -124,10 +237,46 @@ router.get('/:courseid', AuthMiddleware, async (req, res) => {
         options: { sort: { order: 1 } }
       })
       .lean();
+    if (!result) return res.status(404).send('Course not found');
     return res.send(result);
   } catch (error) {
     logger.error('Error in GET /courses/:courseid: %o', error);
     return res.status(500).send(error.message);
+  }
+});
+
+// Generic create (JSON body). Image upload still supported via /registrar
+router.post('/', AuthMiddleware, allowedRoles('Registrar','teacher'), async (req, res) => {
+  try {
+    // Reuse validator; if image omitted that's fine (multer path only on /registrar)
+    const body = { ...req.body, createdBy: req.user._id };
+    const { error } = validateCourse(body);
+    if (error) return res.status(400).send(error.details[0].message);
+    const course = await Course.create(body);
+    return res.status(201).json(course);
+  } catch (error) {
+    logger.error('Error in POST /courses: %o', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// Generic update of editable fields
+router.put('/:courseid', AuthMiddleware, allowedRoles('Registrar','teacher','department_head','department_admin'), async (req, res) => {
+  try {
+    const { courseid } = req.params;
+    const course = await Course.findById(courseid);
+    if (!course) return res.status(404).send('Course not found');
+  const editable = ['name','description','department','assignedTeacher','startDate','endDate','status'];
+    for (const f of editable) if (f in req.body) course[f] = req.body[f];
+    // schedule validation similar to schedule route
+    if (course.startDate && course.endDate && new Date(course.endDate) < new Date(course.startDate)) {
+      return res.status(400).send('Invalid schedule: endDate must be after startDate');
+    }
+    await course.save();
+    return res.json(course);
+  } catch (error) {
+    logger.error('Error in PUT /courses/:courseid: %o', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
@@ -196,20 +345,6 @@ router.put('/:courseid/assign-teacher/:teacherid', AuthMiddleware, allowedRoles(
     return res.status(500).send(error.message);
   }
 });
-router.get('/courses', AuthMiddleware, allowedRoles('teacher'), async (req, res) => {
-    try {
-      const result = await Course.find({
-        $or: [
-          { createdBy: req.user._id },
-          { assignedTeacher: req.user._id }
-        ]
-      }).lean();
-      res.send(result);
-    } catch (error) {
-      res.status(500).send(error.message);
-    }
-  
-    
-  })
+// (moved teacher route above :courseid to prevent CastError when path segment is 'courses')
 
 module.exports=router

@@ -4,18 +4,8 @@ const CourseSchema=mongoose.Schema(
     {
         name:String,
         
-        description:String,
-        image:String,
-        price:{
-            type:Number,
-            min:0,
-            default:0
-        },
-        catagory:{
-            type:mongoose.Schema.Types.ObjectId,
-            ref:"CourseCatagory",
-            default:null
-        },
+    description:String,
+    image:String,
         createdBy:{
             type:mongoose.Schema.Types.ObjectId,
             ref:"User"
@@ -32,7 +22,6 @@ const CourseSchema=mongoose.Schema(
         },
         startDate: { type: Date, default: null },
         endDate: { type: Date, default: null },
-        theme: { type: String, default: '' },
         status:{
             type:Boolean,
             default:false
@@ -53,17 +42,13 @@ const CourseJoi=joi.object({
     name:joi.string().required(),
     description:joi.string().required(),
     image:joi.string().required(),
-    catagory:joi.string().optional(),
-  
     createdBy:joi.string().required(),
-    price:joi.number().required(),
     department:joi.string().optional(),
     assignedTeacher:joi.string().optional(),
     startDate:joi.date().optional(),
     endDate:joi.date().min(joi.ref('startDate')).optional().messages({
         'date.min': 'endDate must be equal to or after startDate'
     }),
-    theme:joi.string().allow('').optional(),
     
     
     

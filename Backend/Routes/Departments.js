@@ -20,7 +20,7 @@ router.post('/', AuthMiddleware, allowedRoles('Registrar'), async (req, res) => 
 });
 
 
-router.get('/', AuthMiddleware, allowedRoles('Registrar','department_head','department_admin','teacher'), async (req, res) => {
+router.get('/', async (req, res) => {
   try {
     const deps = await Department.find().lean();
     return res.send(deps);

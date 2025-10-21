@@ -1,0 +1,22 @@
+.ql-toolbar.ql-snow, .ql-container.ql-snow {
+  border: none !important;
+  box-shadow: none !important;
+}
+/* Remove outline/focus ring from editor */
+.ql-container.ql-snow .ql-editor:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Remove toolbar button focus outline */
+.ql-toolbar button:focus, .ql-toolbar button:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Match background to parent (allows card border to be sole boundary) */
+.ql-toolbar.ql-snow, .ql-container.ql-snow .ql-editor {
+  background: transparent;
+}
+/* Optional subtle divider between toolbar and editor */
+.ql-toolbar.ql-snow + .ql-container.ql-snow {
+  border-top: 1px solid hsl(var(--border)) !important;
+}

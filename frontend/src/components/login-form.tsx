@@ -2,13 +2,55 @@ import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useState } from 'react';
+import { apiClient } from '@/lib/apiClient';
+import { saveAuth } from '@/lib/auth';
+import { useNavigate } from 'react-router';
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"form">) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const navigate = useNavigate();
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (loading) return;
+    setError(null);
+    const form = e.target as HTMLFormElement;
+    const email = (form.querySelector('#email') as HTMLInputElement).value.trim();
+    const password = (form.querySelector('#password') as HTMLInputElement).value;
+    if (!email || !password) return;
+    setLoading(true);
+    try {
+      const resp = await apiClient.login({ email, password });
+      saveAuth({ token: resp.token, role: resp.role, name: resp.name, id: resp.id, department: resp.department || null, pic: resp.pic || null, email: resp.email || null });
+     switch (resp.role) {
+    case "student":
+      return  navigate("/home")
+    case "teacher":
+      return navigate("/overview");
+    case "Registrar":
+      return navigate("/users");
+    case "department_head":
+    case "department_admin":
+      return navigate("/department/overview");
+    case "short_training_office":
+    case "short_training_department":
+      return navigate("/short-training/current-courses");
+    default:
+      // Fallback minimal navigation
+      return navigate("/home");
+  }
+    } catch (err: any) {
+      setError(err?.message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  }
   return (
-    <form className={cn("flex flex-col gap-6", className)}  {...props}>
+    <form className={cn("flex flex-col gap-6", className)}  onSubmit={handleSubmit} {...props}>
       <div className="flex flex-col items-center gap-2 text-center">
         <h1 className="text-2xl font-bold">Login to your account</h1>
         <p className="text-muted-foreground text-sm text-balance">
@@ -32,9 +74,10 @@ export function LoginForm({
           </div>
           <Input id="password" type="password" required />
         </div>
-        <Button type="submit" className="w-full">
-          Login
+        <Button type="submit" className="w-full" disabled={loading}>
+          {loading ? 'Logging in...' : 'Login'}
         </Button>
+        {error && <div className="text-red-500 text-sm" role="alert">{error}</div>}
         <div className="after:border-border relative text-center text-sm after:absolute after:inset-0 after:top-1/2 after:z-0 after:flex after:items-center after:border-t">
           <span className="bg-background text-muted-foreground relative z-10 px-2">
             Or continue with
@@ -52,7 +95,7 @@ export function LoginForm({
       </div>
       <div className="text-center text-sm">
         Don&apos;t have an account?{" "}
-        <a href="#" className="underline underline-offset-4">
+        <a href="/signup" className="underline underline-offset-4">
           Sign up
         </a>
       </div>

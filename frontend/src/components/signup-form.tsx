@@ -1,15 +1,13 @@
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useState } from "react";
+import { apiClient, isApiError } from '@/lib/apiClient';
+import { saveAuth } from '@/lib/auth';
+import { useNavigate } from 'react-router';
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { useDepartments } from '@/hooks/useApiData';
 
 
 export function SignupForm({
@@ -17,7 +15,8 @@ export function SignupForm({
   ...props
 }: React.ComponentProps<"form">) {
 
-    const [step, setStep] = useState(1);
+  const [step, setStep] = useState(1);
+  const { data: departments, isLoading: depsLoading, error: depsError } = useDepartments();
     const [fullName, setFullName] = useState("");
     const [fanNo, setFanNo] = useState("");
     const [department, setDepartment] = useState("");
@@ -30,7 +29,7 @@ export function SignupForm({
 
     const handleNext = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!fullName || !fanNo || !department) {
+      if (!fullName || !fanNo ) {
         setError("Please fill all user information fields.");
         return;
       }
@@ -38,7 +37,9 @@ export function SignupForm({
       setStep(2);
     };
 
-    const handleSignup = (e: React.FormEvent) => {
+    const navigate = useNavigate();
+
+    const handleSignup = async (e: React.FormEvent) => {
       e.preventDefault();
       if (!email || !password || !confirmPassword) {
         setError("Please fill all authentication fields.");
@@ -49,10 +50,23 @@ export function SignupForm({
         return;
       }
       setLoading(true);
-      setTimeout(() => {
+      setError("");
+      try {
+        // Call backend register
+        await apiClient.register({ fullName, email, password, confirmpassword: confirmPassword, department, role: 'student' });
+        // Auto-login after register
+        const resp = await apiClient.login({ email, password });
+        // Persist auth
+        saveAuth({ token: resp.token, role: resp.role || null, name: resp.name || null, id: resp.id || null, department: resp.department || null, pic: resp.pic || null, email: resp.email || null });
+        setSuccess('Signup successful! Redirecting...');
+        setTimeout(() => navigate('/'), 800);
+      } catch (err) {
+        if (isApiError(err)) setError(err.message || 'Signup failed');
+        else if (err instanceof Error) setError(err.message);
+        else setError('Signup failed');
+      } finally {
         setLoading(false);
-        setSuccess("Demo: Signup successful!");
-      }, 1200);
+      }
     };
 
     return (
@@ -80,16 +94,14 @@ export function SignupForm({
               </div>
               <div className="grid gap-3">
                 <Label htmlFor="department">Department</Label>
-                <Select name="department" value={department} onValueChange={setDepartment} required>
+                <Select name="department" value={department} onValueChange={setDepartment} required disabled={depsLoading || !!depsError}>
                   <SelectTrigger id="department">
-                    <SelectValue placeholder="Select department" />
+                    <SelectValue placeholder={depsLoading ? 'Loading...' : (depsError ? 'Failed to load' : 'Select department')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="hr">HR</SelectItem>
-                    <SelectItem value="finance">Finance</SelectItem>
-                    <SelectItem value="engineering">Engineering</SelectItem>
-                    <SelectItem value="marketing">Marketing</SelectItem>
-                    <SelectItem value="sales">Sales</SelectItem>
+                    {departments?.map(opt => (
+                      <SelectItem key={opt._id} value={opt._id}>{opt.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
